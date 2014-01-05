@@ -1,13 +1,15 @@
 import sys
 import numpy as np
 from scipy import optimize
-import pylab as pl
+import matplotlib as mpl
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 
 nPoints = 40                  # discretization
 # number of springs is nPoints - 1
 # number of masses is nPoints
 
-k = 30.0
+k = 300.0
 w = 37.0
 L = 1.0
 D = 0.2
@@ -17,32 +19,38 @@ qw = w / nPoints                      # N
 qEquilibriumLength = L / (nPoints - 1) # m
 
 xStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints))
-yStart = np.linspace(0, D, nPoints)
-zStart = np.zeros(nPoints)
+yStart = np.linspace(0, L, nPoints)
+zStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints))
 
 xyzs = np.c_[xStart, yStart, zStart]
-xyzSift = np.array([[D/2.0, 0.0, 0.0]])
+xyzShift = np.array([[0.0, L / 4.0, 0.0]])
 # print 'coordinates shape', xyzs.shape # gives (nPoints, 3)
-# print 'coordinates shape', xyzSift.shape # gives (1, 3)
-
+# print 'coordinates shape', xyzShift.shape # gives (1, 3)
 
 def closenessPenalty(dist, eqDist=qEquilibriumLength):
     penalty = (eqDist - dist)**3 
     penalty[dist > eqDist] = 0
     return penalty
 
-def selfInteraction(xyzCoordinates, xyzSift):
+def selfInteraction(xyzCoordinates):
     xyzs = xyzCoordinates.reshape((nPoints, 3)).T
-    xs1, ys1, zs1 = xyzs
-    xs2, ys2, zs2 = xyzs - xyzSift.T
+    xs1, ys1, zs1 = xyzs - xyzShift.T
+    xs2, ys2, zs2 = xyzs
+    xs3, ys3, zs3 = xyzs + xyzShift.T
     
     dxsq = (xs1[:,np.newaxis] - xs2[np.newaxis,:]) ** 2
     dysq = (ys1[:,np.newaxis] - ys2[np.newaxis,:]) ** 2
     dzsq = (zs1[:,np.newaxis] - zs2[np.newaxis,:]) ** 2
 
-    dL = np.sqrt(dxsq + dysq + dzsq)
+    dLdown = np.sqrt(dxsq + dysq + dzsq)
 
-    return closenessPenalty(dL).sum()
+    dxsq = (xs2[:,np.newaxis] - xs3[np.newaxis,:]) ** 2
+    dysq = (ys2[:,np.newaxis] - ys3[np.newaxis,:]) ** 2
+    dzsq = (zs2[:,np.newaxis] - zs3[np.newaxis,:]) ** 2
+
+    dLup = np.sqrt(dxsq + dysq + dzsq)
+
+    return closenessPenalty(dLup).sum() + closenessPenalty(dLdown).sum()
 
 def computeEnergy(xyzCoordinates):
     '''Given a (n, 3) vector of points.  This functions
@@ -55,7 +63,7 @@ def computeEnergy(xyzCoordinates):
     xs[0] = 0
     xs[-1] = 0
     ys[0] = 0
-    ys[-1] = D
+    ys[-1] = L
     zs[0] = 0
     zs[-1] = 0
 
@@ -67,60 +75,28 @@ def computeEnergy(xyzCoordinates):
 
     displacementFromEq = dL - qEquilibriumLength   # m
     springEnergy = qk * displacementFromEq**2 / 2.0
-
     totalSpringEnergy = springEnergy.sum()
 
     # "Gravatational" Energy Computation (wrt (0,0))
     # gravEnergy = qw * ys
-
     # totalGravEnergy = gravEnergy.sum()
 
-    energeticContent = totalSpringEnergy +  selfInteraction(xyzCoordinates, xyzSift)
-    # TODO: Remove gravity and add self interactions
+    energeticContent = totalSpringEnergy +  selfInteraction(xyzCoordinates)
 
-    print "\rEnergy:%f" % energeticContent,
+    print "\rEnergy: %5.5f           " % energeticContent,
     sys.stdout.flush()
 
     return energeticContent
 
+# 3d plot
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+colors = np.linspace(0.0, 1.0, 10)
+for c in colors:
+    xs, ys, zs = xyzs.reshape((nPoints, 3)).T
+    ax.plot(xs, ys, zs, color=(0.0, c, c), alpha=0.7, lw=1, ls='-', marker='o', markersize=8)
+    # Optimization of X, Y, and Z
+    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10)
 
-# Optimization of X, Y, and Z
-minimumXYZs = optimize.fmin_cg(computeEnergy, xyzs, maxiter=100)
-
-# print 'minimumXYZs.shape = ', minimumXYZs.shape # gives (3 * nPoints, )
-xs, ys, zs = minimumXYZs.reshape((nPoints, 3)).T
-
-pl.figure()
-pl.plot(xs, ys, "ro", alpha=0.7)
-pl.plot(xStart, yStart, "bo", alpha=0.7)
-pl.axis("equal")
-pl.xlabel('x')
-pl.ylabel('y')
-
-# pl.figure()
-# pl.plot(xs, zs, "ro", alpha=0.7)
-# pl.plot(xs, zs, "b:", alpha=0.7)
-# pl.axis("equal")
-# pl.xlabel('x')
-# pl.ylabel('z')
-
-# pl.figure()
-# pl.plot(np.diff(xs), "ro", alpha=0.7)
-# pl.xlabel('dx')
-
-# pl.figure()
-# pl.plot(np.diff(ys), "ro", alpha=0.7)
-# pl.xlabel('dy')
-
-# pl.figure()
-# pl.plot(np.diff(zs), "ro", alpha=0.7)
-# pl.xlabel('dz')
-
-# print "DX"
-# print np.diff(xs)
-
-# print "DY"
-# print np.diff(ys)
-
-
-pl.show()
+ax.axis("equal")
+plt.show()
