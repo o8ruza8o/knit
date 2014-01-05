@@ -1,0 +1,5 @@
+Polynomial know notes
+http://home.adelphi.edu/~stemkoski/knotgallery/
+
+Curve function tracing notes.
+http://tutorial.math.lamar.edu/Classes/CalcII/ParaArcLength.aspx
