@@ -18,12 +18,12 @@ qk = k * (nPoints - 1)                # N/m
 qw = w / nPoints                      # N
 qEquilibriumLength = L / (nPoints - 1) # m
 
-xStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints))
+xStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
 yStart = np.linspace(0, L, nPoints)
-zStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints))
+zStart = np.cos(np.linspace(0, 2.0 * np.pi, nPoints))
 
 xyzs = np.c_[xStart, yStart, zStart]
-xyzShift = np.array([[0.0, L / 4.0, 0.0]])
+xyzShift = np.array([[0.0, L / 2.0, 0.0]])
 # print 'coordinates shape', xyzs.shape # gives (nPoints, 3)
 # print 'coordinates shape', xyzShift.shape # gives (1, 3)
 
@@ -61,11 +61,12 @@ def computeEnergy(xyzCoordinates):
 
     # Add some constraints / boundary conditions
     xs[0] = 0
-    xs[-1] = 0
-    ys[0] = 0
-    ys[-1] = L
-    zs[0] = 0
-    zs[-1] = 0
+    xs[-1] = L
+    ys[0]  = ys[1]
+    ys[-1] = ys[-2]
+    zs[0] = zs[1]
+    zs[-1] = zs[-2]
+
 
     # Spring Energy Computation
     dx = np.diff(xs)                      # m
@@ -88,13 +89,25 @@ def computeEnergy(xyzCoordinates):
 
     return energeticContent
 
-# 3d plot
+# Create a figure
 fig = plt.figure()
-ax = fig.gca(projection='3d')
+ax = fig.gca( projection='3d' )
 colors = np.linspace(0.0, 1.0, 10)
 for c in colors:
-    xs, ys, zs = xyzs.reshape((nPoints, 3)).T
-    ax.plot(xs, ys, zs, color=(0.0, c, c), alpha=0.7, lw=1, ls='-', marker='o', markersize=8)
+    # Reshape
+    xs1, ys1, zs1 = (xyzs.reshape((nPoints, 3)) - xyzShift).T
+    xs2, ys2, zs2 = xyzs.reshape((nPoints, 3)).T
+    xs3, ys3, zs3 = (xyzs.reshape((nPoints, 3)) + xyzShift).T
+
+    # Plot first
+    ax.plot(ys1, zs1, xs1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(ys2, zs2, xs2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(ys3, zs3, xs3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    
+    ax.plot(ys1, zs1, 2.0 * L - xs1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(ys2, zs2, 2.0 * L - xs2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(ys3, zs3, 2.0 * L - xs3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+
     # Optimization of X, Y, and Z
     xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10)
 
