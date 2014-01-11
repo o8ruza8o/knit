@@ -5,11 +5,11 @@ import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-nPoints = 40                  # discretization
+nPoints = 50                  # discretization
 # number of springs is nPoints - 1
 # number of masses is nPoints
 
-k = 300.0
+k = 0.03
 w = 37.0
 L = 1.0
 D = 0.2
@@ -18,9 +18,9 @@ qk = k * (nPoints - 1)                # N/m
 qw = w / nPoints                      # N
 qEquilibriumLength = L / (nPoints - 1) # m
 
-xStart = np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
+xStart = 0.3 * np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
 yStart = np.linspace(0, L, nPoints)
-zStart = np.cos(np.linspace(0, 2.0 * np.pi, nPoints))
+zStart = np.cos(np.linspace(0, 2.0 * np.pi, nPoints)) - 1.0
 
 xyzs = np.c_[xStart, yStart, zStart]
 xyzShift = np.array([[0.0, L / 2.0, 0.0]])
@@ -28,8 +28,8 @@ xyzShift = np.array([[0.0, L / 2.0, 0.0]])
 # print 'coordinates shape', xyzShift.shape # gives (1, 3)
 
 def closenessPenalty(dist, eqDist=qEquilibriumLength):
-    penalty = (eqDist - dist)**3 
-    penalty[dist > eqDist] = 0
+    penalty = (10.0 * eqDist - dist)**3 
+    penalty[dist > 10.0 * eqDist] = 0
     return penalty
 
 def selfInteraction(xyzCoordinates):
@@ -60,13 +60,14 @@ def computeEnergy(xyzCoordinates):
     xs, ys, zs = xyzCoordinates.reshape((nPoints, 3)).T
 
     # Add some constraints / boundary conditions
-    xs[0] = 0
+    xs[0] = 0.0
     xs[-1] = L
-    ys[0]  = ys[1]
+    ys[0] = ys[1]
     ys[-1] = ys[-2]
     zs[0] = zs[1]
-    zs[-1] = zs[-2]
+    zs[-1] = zs[-2] 
 
+    xyzCoordinates[:] =  np.c_[xs, ys, zs].flatten()
 
     # Spring Energy Computation
     dx = np.diff(xs)                      # m
@@ -82,7 +83,7 @@ def computeEnergy(xyzCoordinates):
     # gravEnergy = qw * ys
     # totalGravEnergy = gravEnergy.sum()
 
-    energeticContent = totalSpringEnergy +  selfInteraction(xyzCoordinates)
+    energeticContent = totalSpringEnergy + selfInteraction(xyzCoordinates)
 
     print "\rEnergy: %5.5f           " % energeticContent,
     sys.stdout.flush()
@@ -92,21 +93,22 @@ def computeEnergy(xyzCoordinates):
 # Create a figure
 fig = plt.figure()
 ax = fig.gca( projection='3d' )
-colors = np.linspace(0.0, 1.0, 10)
+colors = np.linspace(0.0, 1.0, 4)
 for c in colors:
     # Reshape
-    xs1, ys1, zs1 = (xyzs.reshape((nPoints, 3)) - xyzShift).T
-    xs2, ys2, zs2 = xyzs.reshape((nPoints, 3)).T
-    xs3, ys3, zs3 = (xyzs.reshape((nPoints, 3)) + xyzShift).T
+    xs, ys, zs = xyzs.reshape((nPoints, 3)).T
+    x2 = np.concatenate((-xs[::-1], xs[1:]))
+    y2 = np.concatenate((ys[::-1], ys[1:]))
+    z2 = np.concatenate((zs[::-1], zs[1:]))
+
+    xyz = np.c_[x2, y2, z2]
+    x1, y1, z1 = (xyz - xyzShift).T
+    x3, y3, z3 = (xyz + xyzShift).T
 
     # Plot first
-    ax.plot(ys1, zs1, xs1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(ys2, zs2, xs2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(ys3, zs3, xs3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
-    
-    ax.plot(ys1, zs1, 2.0 * L - xs1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(ys2, zs2, 2.0 * L - xs2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(ys3, zs3, 2.0 * L - xs3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(y1, z1, x1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(y2, z2, x2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
+    ax.plot(y3, z3, x3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
 
     # Optimization of X, Y, and Z
     xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10)
