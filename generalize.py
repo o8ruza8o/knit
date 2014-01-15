@@ -5,7 +5,7 @@ import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-nPoints = 50                  # discretization
+nPoints = 200                  # discretization
 # number of springs is nPoints - 1
 # number of masses is nPoints
 
@@ -27,10 +27,10 @@ xyzShift = np.array([[0.0, L / 2.0, 0.0]])
 # print 'coordinates shape', xyzs.shape # gives (nPoints, 3)
 # print 'coordinates shape', xyzShift.shape # gives (1, 3)
 
-def closenessPenalty(dist, eqDist=qEquilibriumLength):
-    penalty = (10.0 * eqDist - dist)**3 
-    penalty[dist > 10.0 * eqDist] = 0
-    return penalty
+def closenessPenalty(dist):
+    penalty = (L / 2.0 - dist)**3 
+    penalty[dist > L / 2.0] = 0
+    return penalty / nPoints
 
 def selfInteraction(xyzCoordinates):
     xyzs = xyzCoordinates.reshape((nPoints, 3)).T
@@ -93,7 +93,7 @@ def computeEnergy(xyzCoordinates):
 # Create a figure
 fig = plt.figure()
 ax = fig.gca( projection='3d' )
-colors = np.linspace(0.0, 1.0, 4)
+colors = np.linspace(0.0, 1.0, 10)
 for c in colors:
     # Reshape
     xs, ys, zs = xyzs.reshape((nPoints, 3)).T
@@ -111,7 +111,7 @@ for c in colors:
     ax.plot(y3, z3, x3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
 
     # Optimization of X, Y, and Z
-    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10)
+    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 50)
 
 ax.axis("equal")
 plt.show()
