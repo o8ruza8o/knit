@@ -5,11 +5,11 @@ import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-nPoints = 200                  # discretization
+nPoints = 100                  # discretization
 # number of springs is nPoints - 1
 # number of masses is nPoints
 
-k = 0.03
+k = 0.4
 w = 37.0
 L = 1.0
 D = 0.2
@@ -28,7 +28,7 @@ xyzShift = np.array([[0.0, L / 2.0, 0.0]])
 # print 'coordinates shape', xyzShift.shape # gives (1, 3)
 
 def closenessPenalty(dist):
-    penalty = (L / 2.0 - dist)**3 
+    penalty = (L / 2.0 - dist)**2 
     penalty[dist > L / 2.0] = 0
     return penalty / nPoints
 
@@ -93,7 +93,7 @@ def computeEnergy(xyzCoordinates):
 # Create a figure
 fig = plt.figure()
 ax = fig.gca( projection='3d' )
-colors = np.linspace(0.0, 1.0, 10)
+colors = np.linspace(0.0, 1.0, 6)
 for c in colors:
     # Reshape
     xs, ys, zs = xyzs.reshape((nPoints, 3)).T
