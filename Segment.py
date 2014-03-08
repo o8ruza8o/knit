@@ -19,8 +19,6 @@ class Segment(object):
         self.qK = totalSpringCoeff * (nPoints - 1)   # N/m
         self.qW = totalMass / nPoints                # N
 
-        self.setupBCs()
-
     def computeSpringLengthDiffs(self):
         dxyz_sq = np.diff(self.xyz, axis=1)**2
         return np.sqrt(dxyz_sq.sum(axis=0))
@@ -74,46 +72,49 @@ class Segment(object):
         plot(ys, zs, ":", color=color, alpha=0.7)
         axis("equal")
 
-    def setupBCs(self):
-        pass
-
-    def enforceBCs(self):
-        pass
-
     def BCEnergyContribution(self):
         pass
 
+    def getDOF(self):
+        return self.xyz.flatten()
+
+    def setDOF(self, values):
+        self.xyz[:] = values.reshape((3,-1))
+
 
 class FixedPointSegment(Segment):
-    def setupBCs(self):
-        self._startPoint = self.xyz[:,0].copy()
-    def enforceBCs(self):
-        self.xyz[:,0] = self._startPoint
+    def getDOF(self):
+        return self.xyz[:,1:].flatten().copy()
+
+    def setDOF(self, values):
+        self.xyz[:,1:][:] = values.reshape((3,-1))
+
 
 class FixedEndsSegment(Segment):
-    def setupBCs(self):
-        self._startPoint = self.xyz[:,0].copy()
-        self._endPoint = self.xyz[:,-1].copy()
-    def enforceBCs(self):
-        self.xyz[:,0] = self._startPoint
-        self.xyz[:,-1] = self._endPoint
+    def getDOF(self):
+        return self.xyz[:,1:-1].flatten().copy()
+
+    def setDOF(self, values):
+        self.xyz[:,1:-1][:] = values.reshape((3,-1))
+
 
 class Simulator(object):
     def __init__(self, segmentList):
         self.segments = segmentList
-        self.DOF = sum([segment.xyz.size for segment in self.segments])
+        self.DOF = sum([segment.getDOF().size for segment in self.segments])
 
     def assignAllDOF(self, values):
-        assert values.size == self.DOF, "Wrong size!"
+        assert values.size == self.DOF, "Wrong size!" + str(values.shape) + " " + str(self.DOF)
 
         offset = 0
         for segment in self.segments:
-            currentSegmentSize = segment.xyz.size
-            segment.xyz[:,:] = values[offset:offset+currentSegmentSize].reshape((3,-1))
+            currentSegmentSize = segment.getDOF().size
+            toSet = values[offset:offset+currentSegmentSize]
+            segment.setDOF(toSet)
             offset += currentSegmentSize
 
     def retrieveAllDOF(self):
-        return np.concatenate([segment.xyz.flatten() for segment in self.segments])
+        return np.concatenate([segment.getDOF().flatten() for segment in self.segments])
 
     def plotAllSegments(self, color=(0,0,1)):
         figure(1)
@@ -141,8 +142,6 @@ class GravatationalSpringSimulator(Simulator):
         return ["computeGravatitionalEnergy", "computeElasticEnergy"]
     def energyFunction(self, allDOF, printPercent = 5 ):
         self.assignAllDOF(allDOF)
-        [segment.enforceBCs() for segment in self.segments]
-        allDOF[:] = self.retrieveAllDOF()
 
         energies = {}
         for segment in self.segments:
