@@ -3,7 +3,7 @@ import numpy as np
 from scipy import optimize
 import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
+from mayavi.mlab import *
 
 nPoints = 100                  # discretization
 # number of springs is nPoints - 1
@@ -60,22 +60,19 @@ def computeEnergy(xyzCoordinates):
     xs, ys, zs = xyzCoordinates.reshape((nPoints, 3)).T
 
     # Add some constraints / boundary conditions
-    xs[0] = 0.0
-    xs[-1] = L
-    ys[0] = ys[1]
-    ys[-1] = ys[-2]
-    zs[0] = zs[1]
-    zs[-1] = zs[-2] 
+    xs[0], xs[-1] = 0.0, L
+    ys[1], ys[-1] = ys[0], ys[-2]
+    zs[1], zs[-1] = zs[0], zs[-2] 
 
     xyzCoordinates[:] =  np.c_[xs, ys, zs].flatten()
 
     # Spring Energy Computation
-    dx = np.diff(xs)                      # m
-    dy = np.diff(ys)                      # m
-    dz = np.diff(zs)                      # m
-    dL = np.sqrt( (dx**2) + (dy**2) + (dz**2) )     # m
+    dx = np.diff(xs)
+    dy = np.diff(ys)
+    dz = np.diff(zs)
+    dL = np.sqrt( (dx**2) + (dy**2) + (dz**2) )
 
-    displacementFromEq = dL - qEquilibriumLength   # m
+    displacementFromEq = dL - qEquilibriumLength
     springEnergy = qk * displacementFromEq**2 / 2.0
     totalSpringEnergy = springEnergy.sum()
 
@@ -91,9 +88,7 @@ def computeEnergy(xyzCoordinates):
     return energeticContent
 
 # Create a figure
-fig = plt.figure()
-ax = fig.gca( projection='3d' )
-colors = np.linspace(0.0, 1.0, 6)
+colors = np.linspace(0.0, 1.0, 3)
 for c in colors:
     # Reshape
     xs, ys, zs = xyzs.reshape((nPoints, 3)).T
@@ -101,17 +96,21 @@ for c in colors:
     y2 = np.concatenate((ys[::-1], ys[1:]))
     z2 = np.concatenate((zs[::-1], zs[1:]))
 
+    # What is going on with BCs
+    print "Xs ", xs[0], xs[-1]
+    print "Ys ", ys[1], ys[-1], ys[0], ys[-2]
+    print "Zs ", zs[1], zs[-1], zs[0], zs[-2] 
+
+
     xyz = np.c_[x2, y2, z2]
     x1, y1, z1 = (xyz - xyzShift).T
     x3, y3, z3 = (xyz + xyzShift).T
 
     # Plot first
-    ax.plot(y1, z1, x1, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(y2, z2, x2, color=(0.0, c, c), alpha=1.0, lw=1, ls='-', marker='o', markersize=8)
-    ax.plot(y3, z3, x3, color=(0.0, c, c), alpha=0.5, lw=1, ls='-', marker='o', markersize=8)
+    plot3d(y1, z1, x1, color=(0.0, c, c), tube_radius=0.025)
+    plot3d(y2, z2, x2, color=(0.0, c, c), tube_radius=0.025)
+    plot3d(y3, z3, x3, color=(0.0, c, c), tube_radius=0.025)
 
     # Optimization of X, Y, and Z
-    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 50)
-
-ax.axis("equal")
-plt.show()
+    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
+show()
