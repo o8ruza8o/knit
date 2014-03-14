@@ -9,7 +9,7 @@ nPoints = 100                  # discretization
 
 k = 0.04
 L = 1.0
-radius = 0.08
+radius = 0.1
 
 qk = k * (nPoints - 1)                 # N/m
 qEquilibriumLength = L / (nPoints - 1) # m
@@ -71,9 +71,12 @@ def computeEnergy(xyzCoordinates):
     xyzCoordinates[:] =  np.c_[xs, ys, zs].flatten()
 
     # Spring Energy Computation
-    dx = np.diff(xs)
-    dy = np.diff(ys)
-    dz = np.diff(zs)
+    dx = (np.diff(xs) + 
+          np.concatenate(([np.diff(xs)[-1]], np.diff(xs)[:-1:]))) / 2.0
+    dy = (np.diff(ys) + 
+          np.concatenate(([np.diff(ys)[-1]], np.diff(ys)[:-1:]))) / 2.0
+    dz = (np.diff(zs) + 
+          np.concatenate(([np.diff(zs)[-1]], np.diff(zs)[:-1:]))) / 2.0
     dL = np.sqrt( (dx**2) + (dy**2) + (dz**2) )
 
     displacementFromEq = dL - qEquilibriumLength
@@ -87,7 +90,7 @@ def computeEnergy(xyzCoordinates):
     return energeticContent
 
 # Optimize and plot
-colors = np.linspace(0.0, 1.0, 5)
+colors = np.linspace(0.0, 1.0, 10)
 for c in colors:
     # Optimization of X, Y, and Zs
     xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
