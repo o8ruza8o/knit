@@ -9,7 +9,7 @@ nPoints = 100               # discretization
 
 k = 0.01
 L = 1.0
-radius = 0.2
+radius = 0.15
 
 qk = k * (nPoints - 1)                 # N/m
 qEquilibriumLength = L / (nPoints - 1) # m
@@ -122,7 +122,7 @@ plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.8*c, 0.8*c, 0.0), tube_radius=r
 plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(c, c, 0.0), tube_radius=radius)
 plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.8*c, 0.8*c, 0.0), tube_radius=radius)
 mayaviscene()
-savefig('stich2.obj')
-savefig('stich2.png')
+savefig('stich.obj')
+savefig('stich.png')
 show()
 
