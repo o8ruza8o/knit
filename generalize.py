@@ -71,7 +71,7 @@ def computeEnergy(xyzCoordinates):
     xs, ys, zs = xyzCoordinates.reshape((2 * nPoints, 3)).T
 
     # Add some constraints / boundary conditions
-    xs[0], xs[-1] = -L, L
+    # xs[0], xs[-1] = -L, L
     # ys[1], ys[-1] = ys[0], ys[-2]
     # zs[1], zs[-1] = zs[0], zs[-2] 
 
@@ -97,7 +97,7 @@ def computeEnergy(xyzCoordinates):
 
     return energeticContent
 
-def mayaviscene():
+def mayaviScene():
     scene.scene.y_minus_view()
 
     scene.scene.camera.position = [0.5, -4.7, 0.0]
@@ -108,21 +108,40 @@ def mayaviscene():
     scene.scene.camera.compute_view_plane_normal()
     scene.scene.render()
 
-# Optimize and plot
-colors = np.linspace(0.0, 1.0, 6)
-for c in colors:
-    # Optimization of X, Y, and Zs
-    print "\n  percent done  " + "{0:.2f}".format(c)
-    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
+def saveStitchData(xyzs_to_save, filename):
+    x1, y1, z1, x2, y2, z2, x3, y3, z3 = Reshape3Stiches(xyzs)
+    with  open(filename, "w") as datafile:
+        datafile.write("x1,y1,z1,x2,y2,z2,x3,y3,z3\n")
+        for i in range(2 * nPoints):
+            datafile.write(str(x1[i]) + "," + 
+                           str(y1[i]) + "," + 
+                           str(z1[i]) + "," +
+                           str(x2[i]) + "," + 
+                           str(y2[i]) + "," + 
+                           str(z2[i]) + "," +
+                           str(x3[i]) + "," + 
+                           str(y3[i]) + "," + 
+                           str(z3[i]) + "\n")
 
-# Plot 3 stiches
-scene = figure()
-xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3 = Reshape3Stiches(xyzs)
-plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.8*c, 0.8*c, 0.0), tube_radius=radius)
-plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(c, c, 0.0), tube_radius=radius)
-plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.8*c, 0.8*c, 0.0), tube_radius=radius)
-mayaviscene()
-savefig('stich.obj')
-savefig('stich.png')
-show()
+if __name__=='__main__':
+    # Optimize
+    colors = np.linspace(0.0, 1.0, 6)
+    for c in colors:
+        # Optimization of X, Y, and Zs
+        print "\n  percent done  " + "{0:.2f}".format(c)
+        xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
+
+    # Save data
+    xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3 = Reshape3Stiches(xyzs)
+    saveStitchData(xyzs, 'noBCstitch-data.csv')
+
+    # Plot 3 stiches
+    scene = figure()
+    plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.0, 0.8*c, 0.8*c), tube_radius=radius)
+    plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(0.0, c, c), tube_radius=radius)
+    plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.0, 0.8*c, 0.8*c), tube_radius=radius)
+    mayaviScene()
+    savefig('noBCstitch.obj')
+    savefig('noBCstitch.png')
+    show()
 
