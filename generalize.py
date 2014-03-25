@@ -3,29 +3,6 @@ import numpy as np
 from scipy import optimize
 from mayavi.mlab import *
 
-nPoints = 100               # discretization
-# number of springs is nPoints - 1
-# number of masses is nPoints
-
-k = 0.01
-L = 1.0
-radius = 0.15
-
-qk = k * (nPoints - 1)                 # N/m
-qEquilibriumLength = L / (nPoints - 1) # m
-
-
-xHalf = 0.3 * np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
-yHalf = np.linspace(0, L, nPoints)
-zHalf = np.cos(np.linspace(0, 2.0 * np.pi, nPoints)) - 1.0
-
-xStart = np.concatenate((-xHalf[::-1], xHalf[:]))
-yStart = np.concatenate((yHalf[::-1], yHalf[:]))
-zStart = np.concatenate((zHalf[::-1], zHalf[:]))
-
-xyzs = np.c_[xStart, yStart, zStart]
-xyzShift = np.array([[0.0, L / 2.0, 0.0]])
-
 def Reshape3Stiches(xyzCoordinates):
     xyzs = xyzCoordinates.reshape((2 * nPoints, 3)).T
     xs1, ys1, zs1 = xyzs - xyzShift.T
@@ -71,9 +48,7 @@ def computeEnergy(xyzCoordinates):
     xs, ys, zs = xyzCoordinates.reshape((2 * nPoints, 3)).T
 
     # Add some constraints / boundary conditions
-    # xs[0], xs[-1] = -L, L
-    # ys[1], ys[-1] = ys[0], ys[-2]
-    # zs[1], zs[-1] = zs[0], zs[-2] 
+    xs[0], xs[-1] = -L, L
 
     # flatten again
     xyzCoordinates[:] =  np.c_[xs, ys, zs].flatten()
@@ -124,24 +99,39 @@ def saveStitchData(xyzs_to_save, filename):
                            str(z3[i]) + "\n")
 
 if __name__=='__main__':
+    # Settup
+    nPoints = 100               # discretization
+    k = 0.01                    # spring const
+    L = 1.0                     # stitch spacing
+    radius = 0.12               # thread radius
+    
+    qk = k * (nPoints - 1)                 # N/m
+    qEquilibriumLength = L / (nPoints - 1) # m
+
+    xHalf = 0.3 * np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
+    yHalf = np.linspace(0, L, nPoints)
+    zHalf = np.cos(np.linspace(0, 2.0 * np.pi, nPoints)) - 1.0
+
+    xStart = np.concatenate((-xHalf[::-1], xHalf[:]))
+    yStart = np.concatenate((yHalf[::-1], yHalf[:]))
+    zStart = np.concatenate((zHalf[::-1], zHalf[:]))
+
+    xyzs = np.c_[xStart, yStart, zStart]
+    xyzShift = np.array([[0.0, 4.0 * radius, 0.0]])
+
     # Optimize
-    colors = np.linspace(0.0, 1.0, 6)
-    for c in colors:
-        # Optimization of X, Y, and Zs
-        print "\n  percent done  " + "{0:.2f}".format(c)
-        xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
+    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 50, epsilon = 0.001)
 
     # Save data
     xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3 = Reshape3Stiches(xyzs)
-    saveStitchData(xyzs, 'noBCstitch-data.csv')
+    saveStitchData(xyzs, 'stitch-data.csv')
 
     # Plot 3 stiches
     scene = figure()
-    plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.0, 0.8*c, 0.8*c), tube_radius=radius)
-    plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(0.0, c, c), tube_radius=radius)
-    plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.0, 0.8*c, 0.8*c), tube_radius=radius)
+    plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.0, 0.8, 0.8), tube_radius=radius)
+    plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(0.0, 1.0, 1.0), tube_radius=radius)
+    plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.0, 0.8, 0.8), tube_radius=radius)
     mayaviScene()
-    savefig('noBCstitch.obj')
-    savefig('noBCstitch.png')
+    savefig('stitch.obj')
+    savefig('stitch.png')
     show()
-
