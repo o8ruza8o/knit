@@ -1,43 +1,23 @@
 import sys
 import numpy as np
 from scipy import optimize
-import matplotlib as mpl
-from mpl_toolkits.mplot3d import Axes3D
 from mayavi.mlab import *
 
-nPoints = 100                  # discretization
-# number of springs is nPoints - 1
-# number of masses is nPoints
-
-k = 0.4
-w = 37.0
-L = 1.0
-D = 0.2
-
-qk = k * (nPoints - 1)                # N/m
-qw = w / nPoints                      # N
-qEquilibriumLength = L / (nPoints - 1) # m
-
-xStart = 0.3 * np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
-yStart = np.linspace(0, L, nPoints)
-zStart = np.cos(np.linspace(0, 2.0 * np.pi, nPoints)) - 1.0
-
-xyzs = np.c_[xStart, yStart, zStart]
-xyzShift = np.array([[0.0, L / 2.0, 0.0]])
-# print 'coordinates shape', xyzs.shape # gives (nPoints, 3)
-# print 'coordinates shape', xyzShift.shape # gives (1, 3)
-
-def closenessPenalty(dist):
-    penalty = (L / 2.0 - dist)**2 
-    penalty[dist > L / 2.0] = 0
-    return penalty / nPoints
-
-def selfInteraction(xyzCoordinates):
-    xyzs = xyzCoordinates.reshape((nPoints, 3)).T
+def Reshape3Stiches(xyzCoordinates):
+    xyzs = xyzCoordinates.reshape((2 * nPoints, 3)).T
     xs1, ys1, zs1 = xyzs - xyzShift.T
     xs2, ys2, zs2 = xyzs
     xs3, ys3, zs3 = xyzs + xyzShift.T
-    
+    return xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3
+
+def closenessPenalty(dist):
+    penalty = (2.0 * radius - dist)**2 
+    penalty[dist > 2.0 * radius] = 0
+    return penalty / nPoints
+
+def selfInteraction(xyzCoordinates):
+    xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3 = Reshape3Stiches(xyzCoordinates)
+
     dxsq = (xs1[:,np.newaxis] - xs2[np.newaxis,:]) ** 2
     dysq = (ys1[:,np.newaxis] - ys2[np.newaxis,:]) ** 2
     dzsq = (zs1[:,np.newaxis] - zs2[np.newaxis,:]) ** 2
@@ -50,36 +30,41 @@ def selfInteraction(xyzCoordinates):
 
     dLup = np.sqrt(dxsq + dysq + dzsq)
 
-    return closenessPenalty(dLup).sum() + closenessPenalty(dLdown).sum()
+    dxsq = (xs1[:,np.newaxis] - xs3[np.newaxis,:]) ** 2
+    dysq = (ys1[:,np.newaxis] - ys3[np.newaxis,:]) ** 2
+    dzsq = (zs1[:,np.newaxis] - zs3[np.newaxis,:]) ** 2
+
+    dLcross = np.sqrt(dxsq + dysq + dzsq)
+
+    return ( closenessPenalty(dLup).sum() + 
+             closenessPenalty(dLdown).sum() +
+             closenessPenalty(dLcross).sum())
 
 def computeEnergy(xyzCoordinates):
     '''Given a (n, 3) vector of points.  This functions
     computes the total energy of the configuration'''
 
     # Unpack the xs, ys and zs
-    xs, ys, zs = xyzCoordinates.reshape((nPoints, 3)).T
+    xs, ys, zs = xyzCoordinates.reshape((2 * nPoints, 3)).T
 
     # Add some constraints / boundary conditions
-    xs[0], xs[-1] = 0.0, L
-    ys[1], ys[-1] = ys[0], ys[-2]
-    zs[1], zs[-1] = zs[0], zs[-2] 
+    xs[0], xs[-1] = -L, L
 
+    # flatten again
     xyzCoordinates[:] =  np.c_[xs, ys, zs].flatten()
 
     # Spring Energy Computation
-    dx = np.diff(xs)
-    dy = np.diff(ys)
-    dz = np.diff(zs)
+    dx =  (np.diff(xs) + 
+           np.concatenate(([np.diff(xs)[-1]], np.diff(xs)[:-1]))) / 2.0
+    dy = (np.diff(ys) + 
+           np.concatenate(([np.diff(ys)[-1]], np.diff(ys)[:-1]))) / 2.0
+    dz = (np.diff(zs) + 
+           np.concatenate(([np.diff(zs)[-1]], np.diff(zs)[:-1]))) / 2.0
     dL = np.sqrt( (dx**2) + (dy**2) + (dz**2) )
 
     displacementFromEq = dL - qEquilibriumLength
     springEnergy = qk * displacementFromEq**2 / 2.0
     totalSpringEnergy = springEnergy.sum()
-
-    # "Gravatational" Energy Computation (wrt (0,0))
-    # gravEnergy = qw * ys
-    # totalGravEnergy = gravEnergy.sum()
-
     energeticContent = totalSpringEnergy + selfInteraction(xyzCoordinates)
 
     print "\rEnergy: %5.5f           " % energeticContent,
@@ -87,30 +72,66 @@ def computeEnergy(xyzCoordinates):
 
     return energeticContent
 
-# Create a figure
-colors = np.linspace(0.0, 1.0, 3)
-for c in colors:
-    # Reshape
-    xs, ys, zs = xyzs.reshape((nPoints, 3)).T
-    x2 = np.concatenate((-xs[::-1], xs[1:]))
-    y2 = np.concatenate((ys[::-1], ys[1:]))
-    z2 = np.concatenate((zs[::-1], zs[1:]))
+def mayaviScene():
+    scene.scene.y_minus_view()
 
-    # What is going on with BCs
-    print "Xs ", xs[0], xs[-1]
-    print "Ys ", ys[1], ys[-1], ys[0], ys[-2]
-    print "Zs ", zs[1], zs[-1], zs[0], zs[-2] 
+    scene.scene.camera.position = [0.5, -4.7, 0.0]
+    scene.scene.camera.focal_point = [0.5, -1.0, 0.0]
+    scene.scene.camera.view_angle = 30.0
+    scene.scene.camera.view_up = [1.0, 0.0, 0.0]
+    scene.scene.camera.clipping_range = [1.4, 6.6]
+    scene.scene.camera.compute_view_plane_normal()
+    scene.scene.render()
 
+def saveStitchData(xyzs_to_save, filename):
+    x1, y1, z1, x2, y2, z2, x3, y3, z3 = Reshape3Stiches(xyzs)
+    with  open(filename, "w") as datafile:
+        datafile.write("x1,y1,z1,x2,y2,z2,x3,y3,z3\n")
+        for i in range(2 * nPoints):
+            datafile.write(str(x1[i]) + "," + 
+                           str(y1[i]) + "," + 
+                           str(z1[i]) + "," +
+                           str(x2[i]) + "," + 
+                           str(y2[i]) + "," + 
+                           str(z2[i]) + "," +
+                           str(x3[i]) + "," + 
+                           str(y3[i]) + "," + 
+                           str(z3[i]) + "\n")
 
-    xyz = np.c_[x2, y2, z2]
-    x1, y1, z1 = (xyz - xyzShift).T
-    x3, y3, z3 = (xyz + xyzShift).T
+if __name__=='__main__':
+    # Settup
+    nPoints = 100               # discretization
+    k = 0.01                    # spring const
+    L = 1.0                     # stitch spacing
+    radius = 0.12               # thread radius
+    
+    qk = k * (nPoints - 1)                 # N/m
+    qEquilibriumLength = L / (nPoints - 1) # m
 
-    # Plot first
-    plot3d(y1, z1, x1, color=(0.0, c, c), tube_radius=0.025)
-    plot3d(y2, z2, x2, color=(0.0, c, c), tube_radius=0.025)
-    plot3d(y3, z3, x3, color=(0.0, c, c), tube_radius=0.025)
+    xHalf = 0.3 * np.sin(np.linspace(0, 2.0 * np.pi, nPoints)) + np.linspace(0, L, nPoints)
+    yHalf = np.linspace(0, L, nPoints)
+    zHalf = np.cos(np.linspace(0, 2.0 * np.pi, nPoints)) - 1.0
 
-    # Optimization of X, Y, and Z
-    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 10, epsilon = 0.001)
-show()
+    xStart = np.concatenate((-xHalf[::-1], xHalf[:]))
+    yStart = np.concatenate((yHalf[::-1], yHalf[:]))
+    zStart = np.concatenate((zHalf[::-1], zHalf[:]))
+
+    xyzs = np.c_[xStart, yStart, zStart]
+    xyzShift = np.array([[0.0, 4.0 * radius, 0.0]])
+
+    # Optimize
+    xyzs = optimize.fmin_cg(computeEnergy, xyzs, maxiter = 50, epsilon = 0.001)
+
+    # Save data
+    xs1, ys1, zs1, xs2, ys2, zs2, xs3, ys3, zs3 = Reshape3Stiches(xyzs)
+    saveStitchData(xyzs, 'stitch-data.csv')
+
+    # Plot 3 stiches
+    scene = figure()
+    plot3d(ys1[1::2], zs1[1::2], xs1[1::2], color=(0.0, 0.8, 0.8), tube_radius=radius)
+    plot3d(ys2[1::2], zs2[1::2], xs2[1::2], color=(0.0, 1.0, 1.0), tube_radius=radius)
+    plot3d(ys3[1::2], zs3[1::2], xs3[1::2], color=(0.0, 0.8, 0.8), tube_radius=radius)
+    mayaviScene()
+    savefig('stitch.obj')
+    savefig('stitch.png')
+    show()
